@@ -5,6 +5,8 @@ import '../../services/product_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/wishlist_service.dart';
+import '../../services/category_service.dart';
+import '../../models/category_model.dart';
 import '../../widgets/product_card.dart';
 import '../../core/utils/auth_guard.dart';
 import '../../core/theme/app_theme.dart';
@@ -22,19 +24,21 @@ class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
   final CartService _cartService = CartService();
   final WishlistService _wishlistService = WishlistService();
+  final CategoryService _categoryService = CategoryService();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   late Stream<List<ProductModel>> _productsStream;
-  late Stream<List<String>> _categoriesStream;
+  late Stream<List<CategoryModel>> _categoriesStream;
   Stream<List<String>>? _wishlistStream;
   String _searchQuery = '';
+  String _selectedCategory = 'All';
 
   @override
   void initState() {
     super.initState();
     _productsStream = _productService.getProductsStream();
-    _categoriesStream = _productService.getCategoriesStream();
+    _categoriesStream = _categoryService.getCategoriesStream();
     
     final userId = _authService.getCurrentUserId();
     if (userId != null) {
@@ -276,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   TextButton(
-                    onPressed: () => Navigator.pushNamed(context, '/catalog'),
+                    onPressed: () => setState(() => _selectedCategory = 'All'),
                     child: Text(
                       'VIEW ALL',
                       style: TextStyle(
@@ -294,16 +298,56 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverToBoxAdapter(
             child: SizedBox(
               height: 140,
-              child: StreamBuilder<List<String>>(
+              child: StreamBuilder<List<CategoryModel>>(
                 stream: _categoriesStream,
                 builder: (context, snapshot) {
-                  final categories = ['All', ...(snapshot.data ?? [])];
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: 5,
+                      itemBuilder: (context, index) => const Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Column(
+                          children: [
+                            SkeletonWidget.circular(size: 84),
+                            SizedBox(height: 10),
+                            SkeletonWidget.rectangular(width: 60, height: 10),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return const Center(
+                      child: Text('Erreur lors du chargement des catégories'),
+                    );
+                  }
+                  
+                  final categories = [
+                    CategoryModel(id: 'All', name: 'All'),
+                    ...(snapshot.data ?? [])
+                  ];
+                  
+                  if (categories.length == 1 && snapshot.connectionState == ConnectionState.active) {
+                     // Only 'All' exists, maybe show nothing or just the 'All' option
+                  }
                   return ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: categories.length,
                     itemBuilder: (context, index) {
-                      return _buildCategoryItem(categories[index]);
+                      final category = categories[index];
+                      return _buildCategoryItem(
+                        category,
+                        _selectedCategory == category.name,
+                        () {
+                          setState(() {
+                            _selectedCategory = category.name;
+                          });
+                        },
+                      );
                     },
                   );
                 },
@@ -365,16 +409,54 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }
               final allProducts = snapshot.data ?? [];
-              final products = _searchQuery.isEmpty 
+              var products = _searchQuery.isEmpty 
                   ? allProducts 
                   : allProducts.where((p) => 
                       p.name.toLowerCase().contains(_searchQuery) || 
                       p.description.toLowerCase().contains(_searchQuery)
                     ).toList();
 
-              if (products.isEmpty && _searchQuery.isNotEmpty) {
-                return const SliverFillRemaining(
-                  child: Center(child: Text('Aucun produit trouvé')),
+              // Apply category filter
+              if (_selectedCategory != 'All') {
+                products = products.where((p) => p.category == _selectedCategory).toList();
+              }
+
+              if (products.isEmpty) {
+                return SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _searchQuery.isNotEmpty ? Icons.search_off_rounded : Icons.inventory_2_outlined,
+                          size: 64,
+                          color: isDark ? Colors.white24 : Colors.grey.shade300,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _searchQuery.isNotEmpty 
+                            ? 'Aucun résultat pour "$_searchQuery"' 
+                            : (_selectedCategory != 'All' ? 'Pas encore d\'articles dans cette section' : 'Le catalogue est vide'),
+                          style: TextStyle(
+                            color: isDark ? Colors.white60 : Colors.grey.shade600,
+                            fontSize: 16,
+                          ),
+                        ),
+                        if (_selectedCategory != 'All' || _searchQuery.isNotEmpty)
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _selectedCategory = 'All';
+                                _searchController.clear();
+                                _searchQuery = '';
+                              });
+                            },
+                            child: const Text('Tout afficher'),
+                          ),
+                      ],
+                    ),
+                  ),
                 );
               }
 
@@ -500,82 +582,74 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCategoryItem(String category) {
+  Widget _buildCategoryItem(CategoryModel category, bool isSelected, VoidCallback onTap) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    String imagePath;
-    bool isAsset = true;
-
-    final cat = category.toLowerCase();
+    final catName = category.name.toLowerCase();
     
-    if (cat.contains('shoe') || cat.contains('sneaker') || cat.contains('chaussure')) {
-      imagePath = 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=300&auto=format&fit=crop';
-      isAsset = false;
-    } else if (cat.contains('shirt') || cat.contains('clothing') || cat.contains('vêtement') || cat.contains('vetement')) {
-      imagePath = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=300&auto=format&fit=crop';
-      isAsset = false;
-    } else if (cat.contains('jean') || cat.contains('pant') || cat.contains('pantalon')) {
-      imagePath = 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?q=80&w=300&auto=format&fit=crop';
-      isAsset = false;
-    } else if (cat.contains('watch') || cat.contains('accessor') || cat.contains('accessoire')) {
-      imagePath = 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49?q=80&w=300&auto=format&fit=crop';
-      isAsset = false;
-    } else if (cat.contains('bag') || cat.contains('tote') || cat.contains('sac')) {
-      imagePath = 'https://images.unsplash.com/photo-1584916201218-f4242ceb4809?q=80&w=300&auto=format&fit=crop';
-      isAsset = false;
-    } else if (cat == 'all' || cat == 'tous') {
+    String imagePath;
+    bool isAsset = false;
+
+    if (category.imageUrl != null) {
+      imagePath = category.imageUrl!;
+    } else if (catName == 'all' || catName == 'tous') {
       imagePath = 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=300&auto=format&fit=crop';
-      isAsset = false;
     } else {
       imagePath = 'https://images.unsplash.com/photo-1445205170230-053b83016050?q=80&w=300&auto=format&fit=crop';
-      isAsset = false;
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(
-        children: [
-          Container(
-            width: 90,
-            height: 90,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: isDark ? Colors.transparent : Colors.black.withOpacity(0.08),
-                  blurRadius: 24,
-                  spreadRadius: 2,
-                  offset: const Offset(0, 8),
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: isSelected ? 96 : 84,
+              height: isSelected ? 96 : 84,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected 
+                      ? (isDark ? AppTheme.accentGold : AppTheme.primaryBlue) 
+                      : Colors.transparent,
+                  width: 3,
                 ),
-              ],
+                color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: isSelected 
+                        ? (isDark ? AppTheme.accentGold.withOpacity(0.3) : AppTheme.primaryBlue.withOpacity(0.2))
+                        : (isDark ? Colors.transparent : Colors.black.withOpacity(0.08)),
+                    blurRadius: isSelected ? 16 : 24,
+                    spreadRadius: isSelected ? 2 : 2,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipOval(
+                child: Image.network(
+                  imagePath,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const Icon(Icons.category_outlined),
+                ),
+              ),
             ),
-            child: ClipOval(
-              child: isAsset
-                  ? Image.asset(
-                      imagePath,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.category_outlined),
-                    )
-                  : Image.network(
-                      imagePath,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.category_outlined),
-                    ),
+            const SizedBox(height: 10),
+            Text(
+              category.name.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
+                letterSpacing: 1.2,
+                color: isSelected 
+                    ? (isDark ? AppTheme.accentGold : AppTheme.primaryBlue)
+                    : (isDark ? Colors.white70 : Colors.black),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            category.toUpperCase(),
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-              color: isDark ? Colors.white70 : Colors.black,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

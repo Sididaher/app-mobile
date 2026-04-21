@@ -4,7 +4,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../services/auth_service.dart';
 import '../../models/user_model.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/theme/theme_manager.dart';
 import '../../widgets/skeleton_widget.dart';
 import '../../widgets/loading_widget.dart';
 
@@ -97,20 +96,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _handleLogout() async {
-    try {
-      await _authService.logout();
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de la déconnexion : $e')),
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -290,7 +275,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 48),
                   
                   // Section: Account Essentials
-                  _buildSectionTitle('ACCOUNT ESSENTIALS'),
+                  _buildSectionTitle('ACCOUNT'),
                   const SizedBox(height: 16),
                   _buildMenuTile(
                     icon: Icons.inventory_2_outlined,
@@ -301,54 +286,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildMenuTile(
                     icon: Icons.location_on_outlined,
                     title: 'Shipping Address',
-                    subtitle: '2 saved locations',
-                    onTap: () {},
+                    subtitle: 'Manage delivery locations',
+                    onTap: () => Navigator.pushNamed(context, '/settings/address'),
                   ),
                   _buildMenuTile(
                     icon: Icons.credit_card_outlined,
                     title: 'Payment Methods',
-                    subtitle: 'Visa ending in •••• 4242',
-                    onTap: () {},
+                    subtitle: 'Cards & preferred ways to pay',
+                    onTap: () => Navigator.pushNamed(context, '/settings/payment'),
                   ),
-                  
-                  const SizedBox(height: 32),
-                  
-                  // Section: Preferences
-                  _buildSectionTitle('PREFERENCES'),
-                  const SizedBox(height: 16),
                   _buildMenuTile(
                     icon: Icons.settings_outlined,
                     title: 'Settings',
-                    subtitle: 'App & notification preferences',
-                    onTap: () {},
-                  ),
-                  _buildThemeTile(),
-                  _buildMenuTile(
-                    icon: Icons.help_outline_rounded,
-                    title: 'Help Center',
-                    subtitle: '24/7 Concierge support',
-                    onTap: () {},
+                    subtitle: 'Preferences, Theme, Language & Support',
+                    onTap: () => Navigator.pushNamed(context, '/settings'),
                   ),
                   
-                  const SizedBox(height: 48),
-                  
-                  // Logout Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: _showLogoutConfirmDialog,
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: isDark ? Colors.red.withOpacity(0.3) : Colors.red.shade100),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        backgroundColor: isDark ? Colors.red.withOpacity(0.05) : Colors.transparent,
-                      ),
-                      child: const Text(
-                        'LOG OUT',
-                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, letterSpacing: 2),
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -450,50 +403,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildThemeTile() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: isDark ? Border.all(color: Colors.white10) : null,
-      ),
-      child: ListenableBuilder(
-        listenable: ThemeManager(),
-        builder: (context, _) {
-          final isDark = ThemeManager().isDarkMode;
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF3F4F6),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                isDark ? Icons.dark_mode : Icons.light_mode,
-                color: isDark ? AppTheme.accentGold : AppTheme.primaryBlue,
-              ),
-            ),
-            title: Text(
-              'Mode Sombre', 
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
-            ),
-            subtitle: Text(
-              isDark ? 'Activé' : 'Désactivé', 
-              style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.grey.shade500),
-            ),
-            trailing: Switch(
-              value: isDark,
-              onChanged: (value) => ThemeManager().toggleTheme(value),
-              activeColor: AppTheme.accentGold,
-            ),
-          );
-        },
-      ),
-    );
-  }
 
   Widget _buildGuestProfile() {
     return Center(
@@ -513,24 +422,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showLogoutConfirmDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Déconnexion'),
-        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _handleLogout();
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Déconnexion'),
-          ),
-        ],
-      ),
-    );
-  }
+
 }

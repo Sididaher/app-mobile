@@ -28,7 +28,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     super.initState();
     _screens = [
       const HomeScreen(),
-      const CategoriesScreen(),
       const WishlistScreen(),
       CartScreen(onReturnHome: () => setState(() => _currentIndex = 0)),
       const ProfileScreen(),
@@ -87,7 +86,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                     color: isDark ? Colors.white : Colors.black87, 
                     size: 26
                   ),
-                  onPressed: () => setState(() => _currentIndex = 3),
+                  onPressed: () => setState(() => _currentIndex = 2),
                 ),
                 if (_cartItemCount > 0)
                   Positioned(
@@ -134,10 +133,9 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _buildNavItem(Icons.home_filled, Icons.home_outlined, 0),
-              _buildNavItem(Icons.grid_view_rounded, Icons.grid_view_outlined, 1),
-              _buildNavItem(Icons.favorite, Icons.favorite_border, 2),
-              _buildNavItem(Icons.shopping_cart, Icons.shopping_cart_outlined, 3),
-              _buildNavItem(Icons.person, Icons.person_outline, 4),
+              _buildNavItem(Icons.favorite, Icons.favorite_border, 1),
+              _buildNavItem(Icons.shopping_cart, Icons.shopping_cart_outlined, 2),
+              _buildNavItem(Icons.person, Icons.person_outline, 3),
             ],
           ),
         ),
@@ -152,7 +150,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     return GestureDetector(
       onTap: () {
         setState(() => _currentIndex = index);
-        if (index == 3) _updateCartItemCount();
+        if (index == 2) _updateCartItemCount();
       },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
