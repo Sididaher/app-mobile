@@ -1,6 +1,6 @@
-# testflutter
+# app-mobile (Achat)
 
-A new Flutter project.
+A new Flutter project for mobile shopping.
 
 ## Getting Started
 
